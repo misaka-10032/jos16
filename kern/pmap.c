@@ -103,7 +103,15 @@ boot_alloc(uint32_t n)
 	//
 	// LAB 2: Your code here.
 
-	return NULL;
+  if (n == 0)
+    return nextfree;
+
+  // TODO: panic if it's out of memory
+
+  result = nextfree;
+  nextfree = ROUNDUP(nextfree+n, PGSIZE);
+
+	return result;
 }
 
 // Set up a two-level page table:
@@ -125,7 +133,7 @@ mem_init(void)
 	i386_detect_memory();
 
 	// Remove this line when you're ready to test this function.
-	panic("mem_init: This function is not finished\n");
+	//panic("mem_init: This function is not finished\n");
 
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
@@ -149,6 +157,7 @@ mem_init(void)
 	// to initialize all fields of each struct PageInfo to 0.
 	// Your code goes here:
 
+  pages = boot_alloc(sizeof(struct PageInfo) * npages);
 
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -240,7 +249,7 @@ page_init(void)
 	//     This way we preserve the real-mode IDT and BIOS structures
 	//     in case we ever need them.  (Currently we don't, but...)
 	//  2) The rest of base memory, [PGSIZE, npages_basemem * PGSIZE)
-	//     is free.
+	//     is free. This kernel doesn't use them at all.
 	//  3) Then comes the IO hole [IOPHYSMEM, EXTPHYSMEM), which must
 	//     never be allocated.
 	//  4) Then extended memory [EXTPHYSMEM, ...).
@@ -251,12 +260,45 @@ page_init(void)
 	// Change the code to reflect this.
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
+
+  // lower and upper bound the regions to be skipped.
+  // inclusive, exclusive.
+  // Sometimes it means addr, sometimes it means idx.
+  uintptr_t lb, ub;
+
+  // 32768 physical pages for 128 MB memory
+  // First link them all.
 	size_t i;
 	for (i = 0; i < npages; i++) {
 		pages[i].pp_ref = 0;
 		pages[i].pp_link = page_free_list;
-		page_free_list = &pages[i];
+		page_free_list = pages + i;
 	}
+
+  // page 0 is in use
+  pages[0].pp_ref = 1;
+  pages[1].pp_link = NULL;
+
+  // [PGSIZE, IOPHYSMEM) of basemem can be reused
+  // [IOPHYSMEM, EXTPHYSMEM) should not be used
+  lb = PGNUM(ROUNDDOWN(IOPHYSMEM, PGSIZE));
+
+  // Kernel is loaded immediately after EXTPHYSMEM.
+  // Pages is allocated immediately after kernel, PGSIZE aligned.
+  // [EXTPHYSMEM, end_of_pages) should not be used
+  // Notice that `end` used here is its link address,
+  // which needs to be converted to physical addr.
+  extern char end[];  // physical addr of end
+  ub = (uintptr_t) ROUNDUP(PADDR(end), PGSIZE);
+  ub += ROUNDUP(sizeof(struct PageInfo) * npages, PGSIZE);
+  ub = 1 + PGNUM(ub);
+  for (i = lb; i < ub; i++) {
+    pages[i].pp_ref = 1;
+    pages[i].pp_link = NULL;
+  }
+
+  // Skipped [160, 346) here.
+  pages[ub].pp_link = pages + lb - 1;
 }
 
 //
@@ -274,8 +316,19 @@ page_init(void)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
-	// Fill this function in
-	return 0;
+  if (!page_free_list)
+    return NULL;
+
+  struct PageInfo* pi = page_free_list;
+  page_free_list = pi->pp_link;
+
+  if (alloc_flags & ALLOC_ZERO)
+    memset((void*) page2kva(pi), 0, PGSIZE);
+
+  pi->pp_link = NULL;
+  // do NOT increment pp_ref here
+
+	return pi;
 }
 
 //
@@ -288,6 +341,16 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+
+  if (pp->pp_ref)
+    panic("pp_ref is not NULL yet!");
+
+  if (pp->pp_link)
+    panic("pp_link is not NULL! Double free?");
+
+  pp->pp_ref = 0;
+  pp->pp_link = page_free_list;
+  page_free_list = pp;
 }
 
 //
