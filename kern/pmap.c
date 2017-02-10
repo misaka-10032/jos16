@@ -143,7 +143,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// Recursively insert PD in itself as a page table, to form
 	// a virtual page table at virtual address UVPT.
-	// (For now, you don't have understand the greater purpose of the
+	// (For now, you don't have to understand the greater purpose of the
 	// following line.)
 
 	// Permissions: kernel R, user R
@@ -181,6 +181,8 @@ mem_init(void)
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
+
+  // TODO
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -326,6 +328,7 @@ page_alloc(int alloc_flags)
     memset((void*) page2kva(pi), 0, PGSIZE);
 
   pi->pp_link = NULL;
+  pi->pp_ref = 0;
   // do NOT increment pp_ref here
 
 	return pi;
@@ -389,8 +392,29 @@ page_decref(struct PageInfo* pp)
 pte_t *
 pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
-	// Fill this function in
-	return NULL;
+  size_t pdx = PDX(va);
+  size_t ptx = PTX(va);
+  size_t pgoff = PGOFF(va);
+
+  pde_t* pde = pgdir + pdx;
+  if (!(*pde & PTE_P)) {
+
+    if (!create)
+      return NULL;
+
+    struct PageInfo* pp = page_alloc(ALLOC_ZERO);
+    if (!pp)
+      return NULL;
+
+    // grant all permissions
+    *pde = page2pa(pp) | PTE_P | PTE_W | PTE_U;
+    pp->pp_ref++;
+
+    // TODO: it only creates page tables, but never recycles?
+  }
+
+  pte_t *pgtab = KADDR(PTE_ADDR(*pde));
+	return pgtab + ptx;
 }
 
 //
@@ -407,7 +431,13 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-	// Fill this function in
+  // assumes that va and pa are page aligned
+  uintptr_t lb = va;
+  uintptr_t ub = 1 + ROUNDDOWN(va + size, PGSIZE);
+  for (va = lb; va < ub; va += PGSIZE, pa += PGSIZE) {
+    pte_t *pte = pgdir_walk(pgdir, (const void*) va, 1);
+    *pte = pa | perm | PTE_P;
+  }
 }
 
 //
@@ -438,7 +468,24 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 int
 page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 {
-	// Fill this function in
+  pte_t* pte = pgdir_walk(pgdir, va, 1);
+  if (!pte)
+    return -E_NO_MEM;
+
+  if (*pte & PTE_P) {  // if the entry is not newly created
+    if (PTE_ADDR(*pte) == page2pa(pp)) {
+      // Special case: if va is re-mapped to the original pp,
+      // page shouldn't be removed. Undo some op's later.
+      tlb_invalidate(pgdir, va);
+      pp->pp_ref--;
+    } else {
+      page_remove(pgdir, va);  // TLB will be invalidated inside
+    }
+  }
+
+  *pte |= page2pa(pp) | perm | PTE_P;
+  pp->pp_ref++;
+
 	return 0;
 }
 
@@ -456,8 +503,16 @@ page_insert(pde_t *pgdir, struct PageInfo *pp, void *va, int perm)
 struct PageInfo *
 page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 {
-	// Fill this function in
-	return NULL;
+  pte_t *pte = pgdir_walk(pgdir, va, 0);
+  if (!pte || !(*pte & PTE_P))
+    // either page table is not present
+    // or the page is not present.
+    return NULL;
+
+  if (pte_store)
+    *pte_store = pte;
+
+	return pa2page(*pte);
 }
 
 //
@@ -478,7 +533,21 @@ page_lookup(pde_t *pgdir, void *va, pte_t **pte_store)
 void
 page_remove(pde_t *pgdir, void *va)
 {
-	// Fill this function in
+  pte_t* pte;
+  struct PageInfo* pp = page_lookup(pgdir, va, &pte);
+  if (!pp) return;
+
+  // The ref count on the physical page should decrement.
+  // The physical page should be freed if the refcount reaches 0.
+  page_decref(pp);
+
+  // The pg table entry corresponding to 'va' should be set to 0.
+  *pte = 0;
+
+  // The TLB must be invalidated
+  tlb_invalidate(pgdir, va);
+
+  // TODO: remove the page table if the entire table is empty.
 }
 
 //
