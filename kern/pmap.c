@@ -148,6 +148,8 @@ mem_init(void)
 
 	// Permissions: kernel R, user R
 	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P;
+  // equivalent to
+  // boot_map_region(pgdir, UVPT, PGSIZE, PADDR(kern_pgdir), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct PageInfo's and store it in 'pages'.
@@ -182,7 +184,10 @@ mem_init(void)
 	//    - pages itself -- kernel RW, user NONE
 	// Your code goes here:
 
-  // TODO
+  // user would be able to read pages at UPAGES
+  boot_map_region(kern_pgdir, UPAGES,
+      ROUNDUP(sizeof(struct PageInfo) * npages, PGSIZE),
+      PADDR(pages), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -196,6 +201,10 @@ mem_init(void)
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
 
+  // exposes KSTACKTOP to kernel to prevent stack overflow in kernel
+  boot_map_region(kern_pgdir, KSTACKTOP-KSTKSIZE, KSTKSIZE,
+      PADDR(bootstack), PTE_W);
+
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE.
 	// Ie.  the VA range [KERNBASE, 2^32) should map to
@@ -204,6 +213,11 @@ mem_init(void)
 	// we just set up the mapping anyway.
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
+
+  // map those above KERNBASE
+  // ~x+1 is actually 2^32 - x
+  boot_map_region(kern_pgdir, KERNBASE, ~KERNBASE+1,
+      0, PTE_W);
 
 	// Check that the initial page directory has been set up correctly.
 	check_kern_pgdir();
@@ -431,10 +445,10 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void
 boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm)
 {
-  // assumes that va and pa are page aligned
-  uintptr_t lb = va;
-  uintptr_t ub = 1 + ROUNDDOWN(va + size, PGSIZE);
-  for (va = lb; va < ub; va += PGSIZE, pa += PGSIZE) {
+  // assumes that va and pa are page aligned,
+  // but size may not.
+  size_t off, off_ub = ROUNDUP(size, PGSIZE);
+  for (off = 0; off < off_ub; off += PGSIZE, va += PGSIZE, pa += PGSIZE) {
     pte_t *pte = pgdir_walk(pgdir, (const void*) va, 1);
     *pte = pa | perm | PTE_P;
   }
