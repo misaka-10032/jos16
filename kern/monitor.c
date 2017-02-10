@@ -59,6 +59,39 @@ int
 mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 {
 	// Your code here.
+  uint32_t *ebpp, *ebp, *eip;
+  uint32_t arg0, arg1, arg2, arg3, arg4;
+  struct Eipdebuginfo eipinfo;
+
+  // discard this frame
+  ebpp = (uint32_t*) read_ebp();
+  ebp  = (uint32_t*) ebpp[0];
+  eip  = (uint32_t*) ebp[1];
+  arg0 = ebp[2];
+  arg1 = ebp[3];
+  arg2 = ebp[4];
+  arg3 = ebp[5];
+  arg4 = ebp[6];
+
+  cprintf("Stack backtrace:\n");
+  while (ebp != 0) {
+    cprintf("  ebp %08x  eip %08x  args %08x %08x %08x %08x %08x\n",
+            ebp, eip, arg0, arg1, arg2, arg3, arg4);
+
+    debuginfo_eip((uintptr_t) eip, &eipinfo);
+    cprintf("       %s:%d: %.*s+%d\n", eipinfo.eip_file,
+            eipinfo.eip_line, eipinfo.eip_fn_namelen,
+            eipinfo.eip_fn_name, (uintptr_t) eip - eipinfo.eip_fn_addr);
+
+    ebpp = ebp;
+    ebp  = (uint32_t*) ebpp[0];
+    eip  = (uint32_t*) ebp[1];
+    arg0 = ebp[2];
+    arg1 = ebp[3];
+    arg2 = ebp[4];
+    arg3 = ebp[5];
+    arg4 = ebp[6];
+  }
 	return 0;
 }
 
@@ -113,7 +146,8 @@ monitor(struct Trapframe *tf)
 {
 	char *buf;
 
-	cprintf("Welcome to the JOS kernel monitor!\n");
+	//cprintf("Welcome to the JOS kernel monitor!\n");
+  cprintf("%CredWelcome %Cwhtto %Cgrnthe %CorgJOS %Cgrykernel %Cpurmonitor!%Cwht\n");
 	cprintf("Type 'help' for a list of commands.\n");
 
 	if (tf != NULL)
