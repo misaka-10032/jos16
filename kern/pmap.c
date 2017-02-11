@@ -166,6 +166,8 @@ mem_init(void)
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
 
+  envs = boot_alloc(sizeof(struct Env) * NENV);
+
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
 	// up the list of free physical pages. Once we've done so, all further
@@ -201,6 +203,11 @@ mem_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
+
+  // user will be able to read envs at UENVS
+  boot_map_region(kern_pgdir, UENVS,
+      ROUNDUP(sizeof(struct Env) * NENV, PGSIZE),
+      PADDR(envs), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -314,12 +321,14 @@ page_init(void)
 
   // Kernel is loaded immediately after EXTPHYSMEM.
   // Pages is allocated immediately after kernel, PGSIZE aligned.
-  // [EXTPHYSMEM, end_of_pages) should not be used
+  // Envs is allocated immediately after pages, PGSIZE aligned.
+  // [EXTPHYSMEM, envs) should not be used.
   // Notice that `end` used here is its link address,
   // which needs to be converted to physical addr.
   extern char end[];  // physical addr of end
   ub = (uintptr_t) ROUNDUP(PADDR(end), PGSIZE);
   ub += ROUNDUP(sizeof(struct PageInfo) * npages, PGSIZE);
+  ub += ROUNDUP(sizeof(struct Env) * NENV, PGSIZE);
   ub = 1 + PGNUM(ub);
   for (i = lb; i < ub; i++) {
     pages[i].pp_ref = 1;

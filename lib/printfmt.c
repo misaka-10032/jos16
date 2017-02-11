@@ -8,7 +8,7 @@
 #include <inc/stdarg.h>
 #include <inc/error.h>
 
-extern int cons_color;
+int cga_color;
 
 /*
  * Space or zero padding and a field width are supported for the numeric
@@ -242,22 +242,22 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
       fmt += 3;
 
       if (cstr[0] >= '0' && cstr[0] <= '9') {
-        cons_color = 0;
-        cons_color += cstr[0] - '0';
-        cons_color *= 10;
-        cons_color += cstr[1] - '0';
-        cons_color *= 10;
-        cons_color += cstr[2];
+        cga_color = 0;
+        cga_color += cstr[0] - '0';
+        cga_color *= 10;
+        cga_color += cstr[1] - '0';
+        cga_color *= 10;
+        cga_color += cstr[2];
       } else {
-        if (!strcmp(cstr, "wht")) cons_color = COLOR_WHT; else
-        if (!strcmp(cstr, "blk")) cons_color = COLOR_BLK; else
-        if (!strcmp(cstr, "grn")) cons_color = COLOR_GRN; else
-        if (!strcmp(cstr, "red")) cons_color = COLOR_RED; else
-        if (!strcmp(cstr, "gry")) cons_color = COLOR_GRY; else
-        if (!strcmp(cstr, "ylw")) cons_color = COLOR_YLW; else
-        if (!strcmp(cstr, "org")) cons_color = COLOR_ORG; else
-        if (!strcmp(cstr, "pur")) cons_color = COLOR_PUR; else
-        if (!strcmp(cstr, "cyn")) cons_color = COLOR_CYN;
+        if (!strcmp(cstr, "wht")) cga_color = COLOR_WHT; else
+        if (!strcmp(cstr, "blk")) cga_color = COLOR_BLK; else
+        if (!strcmp(cstr, "grn")) cga_color = COLOR_GRN; else
+        if (!strcmp(cstr, "red")) cga_color = COLOR_RED; else
+        if (!strcmp(cstr, "gry")) cga_color = COLOR_GRY; else
+        if (!strcmp(cstr, "ylw")) cga_color = COLOR_YLW; else
+        if (!strcmp(cstr, "org")) cga_color = COLOR_ORG; else
+        if (!strcmp(cstr, "pur")) cga_color = COLOR_PUR; else
+        if (!strcmp(cstr, "cyn")) cga_color = COLOR_CYN;
       }
 
       break;
