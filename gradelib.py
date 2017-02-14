@@ -260,6 +260,7 @@ QEMU appears to already be running.  Please exit it if possible or use
         if options.verbose:
             show_command(("make",) + make_args)
         cmd = ("make", "-s", "--no-print-directory") + make_args
+        print('cmd is', cmd)
         self.proc = Popen(cmd, stdout=subprocess.PIPE,
                           stderr=subprocess.STDOUT,
                           stdin=subprocess.PIPE)
@@ -317,6 +318,9 @@ class GDBClient(object):
             except socket.error:
                 if time.time() >= start + timeout:
                     raise
+                else:
+                    # sock bug? if not sleep, connect keeps failing.
+                    time.sleep(.5)
         self.__buf = ""
 
     def fileno(self):
@@ -436,7 +440,7 @@ Failed to shutdown QEMU.  You might need to 'killall qemu' or
     def __monitor_start(self, output):
         if b"\n" in output:
             try:
-                self.gdb = GDBClient(self.qemu.get_gdb_port(), timeout=2)
+                self.gdb = GDBClient(self.qemu.get_gdb_port(), timeout=3)
                 raise TerminateTest
             except socket.error:
                 pass

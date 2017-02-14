@@ -66,7 +66,49 @@ trap_init(void)
 
 	// LAB 3: Your code here.
 
-	// Per-CPU setup 
+  // trap handlers without error code
+  extern void th_divide ();
+  extern void th_debug  ();
+  extern void th_nmi    ();
+  extern void th_brkpt  ();
+  extern void th_oflow  ();
+  extern void th_bound  ();
+  extern void th_illop  ();
+  extern void th_device ();
+  extern void th_fperr  ();
+  extern void th_mchk   ();
+  extern void th_simderr();
+
+  SETGATE(idt[T_DIVIDE ], 0, GD_KT, th_divide , 0);
+  SETGATE(idt[T_DEBUG  ], 0, GD_KT, th_debug  , 0);
+  SETGATE(idt[T_NMI    ], 0, GD_KT, th_nmi    , 0);
+  SETGATE(idt[T_BRKPT  ], 0, GD_KT, th_brkpt  , 3);
+  SETGATE(idt[T_OFLOW  ], 0, GD_KT, th_oflow  , 0);
+  SETGATE(idt[T_BOUND  ], 0, GD_KT, th_bound  , 0);
+  SETGATE(idt[T_ILLOP  ], 0, GD_KT, th_illop  , 0);
+  SETGATE(idt[T_DIVIDE ], 0, GD_KT, th_device , 0);
+  SETGATE(idt[T_FPERR  ], 0, GD_KT, th_fperr  , 0);
+  SETGATE(idt[T_MCHK   ], 0, GD_KT, th_mchk   , 0);
+  SETGATE(idt[T_SIMDERR], 0, GD_KT, th_simderr, 0);
+
+  // trap handlers with error code
+  extern void th_dblflt();
+  extern void th_tss   ();
+  extern void th_segnp ();
+  extern void th_stack ();
+  extern void th_gpflt ();
+  extern void th_pgflt ();
+  extern void th_align ();
+
+  SETGATE(idt[T_DBLFLT], 0, GD_KT, th_dblflt, 0);
+  SETGATE(idt[T_TSS   ], 0, GD_KT, th_tss   , 0);
+  SETGATE(idt[T_SEGNP ], 0, GD_KT, th_segnp , 0);
+  SETGATE(idt[T_STACK ], 0, GD_KT, th_stack , 0);
+  SETGATE(idt[T_GPFLT ], 0, GD_KT, th_gpflt , 0);
+  SETGATE(idt[T_PGFLT ], 0, GD_KT, th_pgflt , 0);
+  SETGATE(idt[T_ALIGN ], 0, GD_KT, th_align , 0);
+
+	// Per-CPU setup
 	trap_init_percpu();
 }
 
