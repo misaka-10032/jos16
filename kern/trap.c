@@ -79,10 +79,11 @@ trap_init(void)
   extern void th_mchk   ();
   extern void th_simderr();
 
+  // last arg is privilege level: 0 for kernel; 3 for user.
   SETGATE(idt[T_DIVIDE ], 0, GD_KT, th_divide , 0);
   SETGATE(idt[T_DEBUG  ], 0, GD_KT, th_debug  , 0);
   SETGATE(idt[T_NMI    ], 0, GD_KT, th_nmi    , 0);
-  SETGATE(idt[T_BRKPT  ], 0, GD_KT, th_brkpt  , 3);
+  SETGATE(idt[T_BRKPT  ], 0, GD_KT, th_brkpt  , 3);  // user can trigger brkpt
   SETGATE(idt[T_OFLOW  ], 0, GD_KT, th_oflow  , 0);
   SETGATE(idt[T_BOUND  ], 0, GD_KT, th_bound  , 0);
   SETGATE(idt[T_ILLOP  ], 0, GD_KT, th_illop  , 0);
@@ -186,6 +187,14 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
 
+  switch(tf->tf_trapno) {
+    case T_PGFLT:
+      page_fault_handler(tf);
+      return;
+    default:
+      cprintf("Trap %s ignored!\n", trapname(tf->tf_trapno));
+  }
+
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -244,8 +253,14 @@ page_fault_handler(struct Trapframe *tf)
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
-
 	// LAB 3: Your code here.
+
+  if (tf->tf_cs == GD_KT) {
+    cprintf("kernel fault va %08x ip %08x\n",
+        fault_va, tf->tf_eip);
+    print_trapframe(tf);
+    return;
+  }
 
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
