@@ -191,6 +191,9 @@ trap_dispatch(struct Trapframe *tf)
     case T_PGFLT:
       page_fault_handler(tf);
       return;
+    case T_BRKPT:
+      breakpoint_handler(tf);
+      return;
     default:
       cprintf("Trap %s ignored!\n", trapname(tf->tf_trapno));
   }
@@ -272,3 +275,9 @@ page_fault_handler(struct Trapframe *tf)
 	env_destroy(curenv);
 }
 
+void
+breakpoint_handler(struct Trapframe *tf)
+{
+  print_trapframe(tf);
+  monitor(tf);
+}
