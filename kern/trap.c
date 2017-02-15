@@ -78,6 +78,7 @@ trap_init(void)
   extern void th_fperr  ();
   extern void th_mchk   ();
   extern void th_simderr();
+  extern void th_syscall();
 
   // last arg is privilege level: 0 for kernel; 3 for user.
   SETGATE(idt[T_DIVIDE ], 0, GD_KT, th_divide , 0);
@@ -91,6 +92,7 @@ trap_init(void)
   SETGATE(idt[T_FPERR  ], 0, GD_KT, th_fperr  , 0);
   SETGATE(idt[T_MCHK   ], 0, GD_KT, th_mchk   , 0);
   SETGATE(idt[T_SIMDERR], 0, GD_KT, th_simderr, 0);
+  SETGATE(idt[T_SYSCALL], 0, GD_KT, th_syscall, 3);  // user triggers syscall
 
   // trap handlers with error code
   extern void th_dblflt();
@@ -194,6 +196,9 @@ trap_dispatch(struct Trapframe *tf)
     case T_BRKPT:
       breakpoint_handler(tf);
       return;
+    case T_SYSCALL:
+      syscall_handler(tf);
+      return;
     default:
       cprintf("Trap %s ignored!\n", trapname(tf->tf_trapno));
   }
@@ -280,4 +285,17 @@ breakpoint_handler(struct Trapframe *tf)
 {
   print_trapframe(tf);
   monitor(tf);
+}
+
+void
+syscall_handler(struct Trapframe *tf)
+{
+  struct PushRegs *regs = &tf->tf_regs;
+  uint32_t arg1 = regs->reg_edx;
+  uint32_t arg2 = regs->reg_ecx;
+  uint32_t arg3 = regs->reg_ebx;
+  uint32_t arg4 = regs->reg_edi;
+  uint32_t arg5 = regs->reg_esi;
+  regs->reg_eax = syscall(regs->reg_eax,
+      arg1, arg2, arg3, arg4, arg5);
 }
