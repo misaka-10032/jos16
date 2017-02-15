@@ -320,7 +320,7 @@ class GDBClient(object):
                     raise
                 else:
                     # sock bug? if not sleep, connect keeps failing.
-                    time.sleep(.5)
+                    time.sleep(.1)
         self.__buf = ""
 
     def fileno(self):
