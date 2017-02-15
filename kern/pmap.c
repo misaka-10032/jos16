@@ -474,12 +474,12 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
   // handles overflow (size covering the entire size_t space)
   assert(va == ROUNDDOWN(va, PGSIZE));
   assert(pa == ROUNDDOWN(pa, PGSIZE));
-  uintptr_t ub = va + ROUNDUP(size, PGSIZE);
+  uintptr_t va_ub = va + ROUNDUP(size, PGSIZE);
   do {
     pte_t *pte = pgdir_walk(pgdir, (const void*) va, 1);
     *pte = pa | perm | PTE_P;
     va += PGSIZE, pa += PGSIZE;
-  } while (va != ub);
+  } while (va != va_ub);
 }
 
 //
@@ -629,7 +629,23 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
 
-  // TODO
+  const void *va_old = va;
+  va = ROUNDDOWN(va, PGSIZE);
+  len += va_old - va;
+  const void *va_ub = va + ROUNDUP(len, PGSIZE);
+  perm |= PTE_P;
+
+  do {
+    pte_t *pte = pgdir_walk(env->env_pgdir, va, 0);
+    if ((uintptr_t) va > ULIM ||
+        !pte || (*pte & perm) != perm) {
+      user_mem_check_addr = (uintptr_t) (va < va_old ? va_old : va);
+      return -E_FAULT;
+    }
+
+    // next page
+    va += PGSIZE;
+  } while (va != va_ub);
 
 	return 0;
 }
