@@ -8,6 +8,8 @@
 #include <inc/stdarg.h>
 #include <inc/error.h>
 
+int cga_color;
+
 /*
  * Space or zero padding and a field width are supported for the numeric
  * formats only.
@@ -89,6 +91,7 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 	unsigned long long num;
 	int base, lflag, width, precision, altflag;
 	char padc;
+  char cstr[4];
 
 	while (1) {
 		while ((ch = *(unsigned char *) fmt++) != '%') {
@@ -207,11 +210,9 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 
 		// (unsigned) octal
 		case 'o':
-			// Replace this with your code.
-			putch('X', putdat);
-			putch('X', putdat);
-			putch('X', putdat);
-			break;
+      num = getuint(&ap, lflag);
+      base = 8;
+      goto number;
 
 		// pointer
 		case 'p':
@@ -226,6 +227,7 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 		case 'x':
 			num = getuint(&ap, lflag);
 			base = 16;
+
 		number:
 			printnum(putch, putdat, num, base, width, padc);
 			break;
@@ -234,6 +236,33 @@ vprintfmt(void (*putch)(int, void*), void *putdat, const char *fmt, va_list ap)
 		case '%':
 			putch(ch, putdat);
 			break;
+
+    // global color setting
+    case 'C':
+      memmove(cstr, fmt, 3);
+      cstr[3] = 0;
+      fmt += 3;
+
+      if (cstr[0] >= '0' && cstr[0] <= '9') {
+        cga_color = 0;
+        cga_color += cstr[0] - '0';
+        cga_color *= 10;
+        cga_color += cstr[1] - '0';
+        cga_color *= 10;
+        cga_color += cstr[2];
+      } else {
+        if (!strcmp(cstr, "wht")) cga_color = COLOR_WHT; else
+        if (!strcmp(cstr, "blk")) cga_color = COLOR_BLK; else
+        if (!strcmp(cstr, "grn")) cga_color = COLOR_GRN; else
+        if (!strcmp(cstr, "red")) cga_color = COLOR_RED; else
+        if (!strcmp(cstr, "gry")) cga_color = COLOR_GRY; else
+        if (!strcmp(cstr, "ylw")) cga_color = COLOR_YLW; else
+        if (!strcmp(cstr, "org")) cga_color = COLOR_ORG; else
+        if (!strcmp(cstr, "pur")) cga_color = COLOR_PUR; else
+        if (!strcmp(cstr, "cyn")) cga_color = COLOR_CYN;
+      }
+
+      break;
 
 		// unrecognized escape sequence - just print it literally
 		default:

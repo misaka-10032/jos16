@@ -7,6 +7,17 @@
 #define NULL	((void *) 0)
 #endif /* !NULL */
 
+// console colors
+#define COLOR_WHT 7
+#define COLOR_BLK 1
+#define COLOR_GRN 2
+#define COLOR_RED 4
+#define COLOR_GRY 8
+#define COLOR_YLW 15
+#define COLOR_ORG 12
+#define COLOR_PUR 6
+#define COLOR_CYN 11
+
 // lib/stdio.c
 void	cputchar(int c);
 int	getchar(void);
