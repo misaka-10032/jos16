@@ -471,11 +471,15 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 {
   // assumes that va and pa are page aligned,
   // but size may not.
-  size_t off, off_ub = ROUNDUP(size, PGSIZE);
-  for (off = 0; off < off_ub; off += PGSIZE, va += PGSIZE, pa += PGSIZE) {
+  // handles overflow (size covering the entire size_t space)
+  assert(va == ROUNDDOWN(va, PGSIZE));
+  assert(pa == ROUNDDOWN(pa, PGSIZE));
+  uintptr_t ub = va + ROUNDUP(size, PGSIZE);
+  do {
     pte_t *pte = pgdir_walk(pgdir, (const void*) va, 1);
     *pte = pa | perm | PTE_P;
-  }
+    va += PGSIZE, pa += PGSIZE;
+  } while (va != ub);
 }
 
 //
@@ -624,6 +628,8 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+
+  // TODO
 
 	return 0;
 }

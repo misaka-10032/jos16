@@ -264,9 +264,9 @@ page_fault_handler(struct Trapframe *tf)
 	// LAB 3: Your code here.
 
   if (tf->tf_cs == GD_KT) {
-    cprintf("kernel fault va %08x ip %08x\n",
-        fault_va, tf->tf_eip);
     print_trapframe(tf);
+    panic("kernel fault va %08x ip %08x\n",
+          fault_va, tf->tf_eip);
     return;
   }
 

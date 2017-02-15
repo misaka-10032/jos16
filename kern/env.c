@@ -286,12 +286,11 @@ region_alloc(struct Env *e, void *va, size_t len)
   //
   // Corner: va+len == MAX_INT
 
-  void* va_old = va;
+  void *va_old = va;
   va = ROUNDDOWN(va, PGSIZE);
   len += va_old - va;
-
-  size_t off, off_ub = ROUNDUP(len, PGSIZE);
-  for (off = 0; off < off_ub; off += PGSIZE, va += PGSIZE) {
+  void *va_ub = va + ROUNDUP(len, PGSIZE);
+  do {
     // allocate a new physical page
     // do not have to init it with 0's
     // simply panic if it's out of space
@@ -302,7 +301,10 @@ region_alloc(struct Env *e, void *va, size_t len)
 
     // map va to pp; maintain pp_ref.
     page_insert(e->env_pgdir, pp, va, PTE_U | PTE_W);
-  }
+
+    // next va
+    va += PGSIZE;
+  } while (va != va_ub);
 }
 
 //
