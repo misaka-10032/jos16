@@ -294,6 +294,25 @@ mem_init_mp(void)
 
 }
 
+static void
+ppn_skip(size_t ppn_lb, size_t ppn_ub)
+{
+  assert(ppn_ub > ppn_lb);
+  if (ppn_lb > 0)
+    assert(!pages[ppn_lb-1].pp_ref);
+  if (ppn_ub < npages)
+    assert(!pages[ppn_ub].pp_ref);
+
+  size_t i;
+  for (i = ppn_lb; i < ppn_ub; i++) {
+    pages[i].pp_ref = 1;
+    pages[i].pp_link = NULL;
+  }
+
+  if (ppn_ub < npages)
+    pages[ppn_ub].pp_link = ppn_lb > 0 ? pages + ppn_lb - 1 : NULL;
+}
+
 // --------------------------------------------------------------
 // Tracking of physical pages.
 // The 'pages' array has one 'struct PageInfo' entry per physical page.
@@ -309,10 +328,6 @@ mem_init_mp(void)
 void
 page_init(void)
 {
-	// LAB 4:
-	// Change your code to mark the physical page at MPENTRY_PADDR
-	// as in use
-
 	// The example code here marks all physical pages as free.
 	// However this is not truly the case.  What memory is free?
 	//  1) Mark physical page 0 as in use.
@@ -331,11 +346,6 @@ page_init(void)
 	// NB: DO NOT actually touch the physical memory corresponding to
 	// free pages!
 
-  // lower and upper bound the regions to be skipped.
-  // inclusive, exclusive.
-  // Sometimes it means addr, sometimes it means idx.
-  uintptr_t lb, ub;
-
   // 32768 physical pages for 128 MB memory
   // First link them all.
 	size_t i;
@@ -346,31 +356,29 @@ page_init(void)
 	}
 
   // page 0 is in use
-  pages[0].pp_ref = 1;
-  pages[1].pp_link = NULL;
+  // skip [0, 1)
+  ppn_skip(0, 1);
 
-  // [PGSIZE, IOPHYSMEM) of basemem can be reused
-  // [IOPHYSMEM, EXTPHYSMEM) should not be used
-  lb = PGNUM(ROUNDDOWN(IOPHYSMEM, PGSIZE));
+	// LAB 4:
+	// Change your code to mark the physical page at MPENTRY_PADDR
+	// as in use
+  // [PGSIZE, MPENTRY_PADDR) of basemem can be reused.
+  // [MPENTRY_PADDR, MPENTRY_PADDR+PGSIZE) should be skipped.
+  // assumes MPENTRY_PADDR is page aligned.
+  ppn_skip(PGNUM(MPENTRY_PADDR), PGNUM(MPENTRY_PADDR)+1);
 
+  // [MPENTRY_PADDR+PGSIZE, IOPHYSMEM) of basemem can be reused.
+  // [IOPHYSMEM, EXTPHYSMEM) should be skipped.
   // Kernel is loaded immediately after EXTPHYSMEM.
   // Pages is allocated immediately after kernel, PGSIZE aligned.
   // Envs is allocated immediately after pages, PGSIZE aligned.
-  // [EXTPHYSMEM, envs) should not be used.
-  // Notice that `end` used here is its link address,
-  // which needs to be converted to physical addr.
-  extern char end[];  // physical addr of end
-  ub = (uintptr_t) ROUNDUP(PADDR(end), PGSIZE);
-  ub += ROUNDUP(sizeof(struct PageInfo) * npages, PGSIZE);
-  ub += ROUNDUP(sizeof(struct Env) * NENV, PGSIZE);
-  ub = 1 + PGNUM(ub);
-  for (i = lb; i < ub; i++) {
-    pages[i].pp_ref = 1;
-    pages[i].pp_link = NULL;
-  }
-
-  // Skipped [160, 346) here.
-  pages[ub].pp_link = pages + lb - 1;
+  // [EXTPHYSMEM, upper_lb) is further skipped.
+  // In short, [IOPHYSMEM, upper_lb) together should be skipped,
+  // where upper_lb is the start of pages above the end of boot_alloc.
+  // Assumes IOPHYSMEM and EXTPHYSMEM are page aligned.
+  // skipped [160, ?), depending on end of kernel.
+  physaddr_t upper_lb = PADDR(boot_alloc(0));
+  ppn_skip(PGNUM(IOPHYSMEM), PGNUM(upper_lb));
 }
 
 //
@@ -650,6 +658,8 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// beginning of the MMIO region.  Because this is static, its
 	// value will be preserved between calls to mmio_map_region
 	// (just like nextfree in boot_alloc).
+
+  // assumes base is already aligned
 	static uintptr_t base = MMIOBASE;
 
 	// Reserve size bytes of virtual memory starting at base and
@@ -670,7 +680,15 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+
+  size = ROUNDUP(size, PGSIZE);
+  if (base + size > MMIOLIM)
+    panic("MMIO used up!");
+
+  boot_map_region(kern_pgdir, base, size, pa,
+                  PTE_PCD | PTE_PWT | PTE_W);
+  base += size;
+  return (void*) base - size;
 }
 
 static uintptr_t user_mem_check_addr;
