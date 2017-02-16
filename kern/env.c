@@ -55,6 +55,7 @@ struct Segdesc gdt[NCPU + 5] =
 
 	// Per-CPU TSS descriptors (starting from GD_TSS0) are initialized
 	// in trap_init_percpu()
+  // each cpu has a new entry after this.
 	[GD_TSS0 >> 3] = SEG_NULL
 };
 
