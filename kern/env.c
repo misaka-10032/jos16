@@ -576,6 +576,9 @@ env_run(struct Env *e)
   e->env_runs++;
   lcr3(PADDR(e->env_pgdir));
 
+  // release the kernel lock before returning to user env
+  unlock_kernel();
+
   // this function does not return;
   // it jumps to the env code.
   env_pop_tf(&e->env_tf);
