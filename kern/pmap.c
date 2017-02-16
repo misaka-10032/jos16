@@ -292,6 +292,12 @@ mem_init_mp(void)
 	//
 	// LAB 4: Your code here:
 
+  size_t i;
+  uintptr_t kst_i = KSTACKTOP;
+  for (i = 0; i < NCPU; i++, kst_i -= KSTKSIZE + KSTKGAP) {
+    boot_map_region(kern_pgdir, kst_i-KSTKSIZE, KSTKSIZE,
+        PADDR(percpu_kstacks[i]), PTE_W);
+  }
 }
 
 static void
@@ -517,6 +523,10 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
   assert(va == ROUNDDOWN(va, PGSIZE));
   assert(pa == ROUNDDOWN(pa, PGSIZE));
   uintptr_t va_ub = va + ROUNDUP(size, PGSIZE);
+  if (va_ub <= va)
+    cprintf("%CredWARNING: It loops over when mapping %p to %p!%Cwht\n",
+            va, va_ub);
+
   do {
     pte_t *pte = pgdir_walk(pgdir, (const void*) va, 1);
     *pte = pa | perm | PTE_P;
