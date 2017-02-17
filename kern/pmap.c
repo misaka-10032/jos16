@@ -524,7 +524,7 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
   assert(pa == ROUNDDOWN(pa, PGSIZE));
   uintptr_t va_ub = va + ROUNDUP(size, PGSIZE);
   if (va_ub <= va)
-    cprintf("%CredWARNING: It loops over when mapping %p to %p!%Cwht\n",
+    cprintf("%CredWARNING: It rolls over when mapping %p to %p!%Cwht\n",
             va, va_ub);
 
   do {

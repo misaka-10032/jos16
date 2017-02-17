@@ -29,7 +29,7 @@ sched_yield(void)
 	// LAB 4: Your code here.
   struct Env *next = NULL;
   int i, eid = curenv ? curenv->env_id : 0;
-  for (i = 1; i < NENV; i++) {
+  for (i = 0; i < NENV; i++) {
     struct Env *env = &envs[(eid+i) % NENV];
     if (env->env_status == ENV_RUNNABLE) {
       next = env;
