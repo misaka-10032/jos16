@@ -371,12 +371,43 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
+  if (!curenv->env_pgfault_upcall)
+    goto userfault;
 
+  // User is responsible for allocating page for UXSTACKTOP.
+  user_mem_assert(curenv, (const void*) UXSTACKTOP - sizeof(uintptr_t),
+                  sizeof(uintptr_t), PTE_U | PTE_W);
+
+  // Setup the arg utf for pgfault_handler.
+  // Leave scratch space only for recursive pgfault.
+  // For non-recursive ones, it will be under the previous stack in USTACK.
+  uintptr_t top = tf->tf_esp < UXSTACKTOP && tf->tf_esp > UXSTACKTOP - PGSIZE ?
+    tf->tf_esp - sizeof(uintptr_t) : UXSTACKTOP;
+
+  // stack grows down but memory goes up.
+  struct UTrapframe *utf = (struct UTrapframe *) top - 1;
+  if ((uintptr_t) utf < UXSTACKTOP - PGSIZE)
+    goto userfault;
+
+  // copy from tf to utf
+  utf->utf_fault_va = fault_va;
+  utf->utf_err = tf->tf_err;
+  utf->utf_regs = tf->tf_regs;
+  utf->utf_eip = tf->tf_eip;
+  utf->utf_eflags = tf->tf_eflags;
+  utf->utf_esp = tf->tf_esp;
+
+  // As now it's in user mode, tf is exactly curenv->env_tf.
+  tf->tf_esp = (uintptr_t) utf;
+  tf->tf_eip = (uintptr_t) curenv->env_pgfault_upcall;
+  env_run(curenv);  // never returns
+
+userfault:
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
-		curenv->env_id, fault_va, tf->tf_eip);
+		      curenv->env_id, fault_va, tf->tf_eip);
 	print_trapframe(tf);
-	env_destroy(curenv);
+  env_destroy(curenv);
 }
 
 void
