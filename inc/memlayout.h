@@ -110,6 +110,7 @@
 
 // User read-only virtual page table (see 'uvpt' below)
 #define UVPT		(ULIM - PTSIZE)
+#define UVPD    (UVPT + (UVPT>>12)*4)
 // Read-only copies of the Page structures
 #define UPAGES		(UVPT - PTSIZE)
 // Read-only copies of the global env structures

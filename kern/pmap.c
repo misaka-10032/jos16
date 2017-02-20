@@ -150,9 +150,10 @@ mem_init(void)
 	// following line.)
 
 	// Permissions: kernel R, user R
+  // Set it up in order to find page tables in user space.
+  // UVPT[i] points to the ith page table.
+  // https://pdos.csail.mit.edu/6.828/2016/labs/lab4/uvpt.html
 	kern_pgdir[PDX(UVPT)] = PADDR(kern_pgdir) | PTE_U | PTE_P;
-  // equivalent to
-  // boot_map_region(pgdir, UVPT, PGSIZE, PADDR(kern_pgdir), PTE_U);
 
 	//////////////////////////////////////////////////////////////////////
 	// Allocate an array of npages 'struct PageInfo's and store it in 'pages'.

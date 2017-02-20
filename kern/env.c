@@ -264,6 +264,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
+  // TODO
 
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
@@ -303,6 +304,9 @@ region_alloc(struct Env *e, void *va, size_t len)
   va = ROUNDDOWN(va, PGSIZE);
   len += va_old - va;
   void *va_ub = va + ROUNDUP(len, PGSIZE);
+  if (va_ub <= va)
+    cprintf("%CredWARNING: Rollover at region_alloc!%Cwht\n");
+
   do {
     // allocate a new physical page
     // do not have to init it with 0's
