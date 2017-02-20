@@ -116,6 +116,22 @@ trap_init(void)
   SETGATE(idt[T_PGFLT ], 0, GD_KT, th_pgflt , 0);
   SETGATE(idt[T_ALIGN ], 0, GD_KT, th_align , 0);
 
+  // irq's
+  extern void th_timer   ();
+  extern void th_kbd     ();
+  extern void th_serial  ();
+  extern void th_spurious();
+  extern void th_ide     ();
+  extern void th_error   ();
+
+  struct Gatedesc *irqt = idt + IRQ_OFFSET;
+  SETGATE(irqt[IRQ_TIMER   ], 0, GD_KT, th_timer   , 0);
+  SETGATE(irqt[IRQ_KBD     ], 0, GD_KT, th_kbd     , 0);
+  SETGATE(irqt[IRQ_SERIAL  ], 0, GD_KT, th_serial  , 0);
+  SETGATE(irqt[IRQ_SPURIOUS], 0, GD_KT, th_spurious, 0);
+  SETGATE(irqt[IRQ_IDE     ], 0, GD_KT, th_ide     , 0);
+  SETGATE(irqt[IRQ_ERROR   ], 0, GD_KT, th_error   , 0);
+
 	// Per-CPU setup for BSP
 	trap_init_percpu();
 }
@@ -240,7 +256,10 @@ trap_dispatch(struct Trapframe *tf)
 	  // Handle clock interrupts. Don't forget to acknowledge the
 	  // interrupt using lapic_eoi() before calling the scheduler!
 	  // LAB 4: Your code here.
-    // TODO
+    case IRQ_TIMER:
+      lapic_eoi();
+      sched_yield();
+      return;
   }
 
   // Handle custom interrupts
@@ -276,6 +295,7 @@ trap(struct Trapframe *tf)
 	// sched_yield()
 	if (xchg(&thiscpu->cpu_status, CPU_STARTED) == CPU_HALTED)
 		lock_kernel();
+
 	// Check that interrupts are disabled.  If this assertion
 	// fails, DO NOT be tempted to fix it by inserting a "cli" in
 	// the interrupt path.

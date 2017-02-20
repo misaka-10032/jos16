@@ -21,25 +21,34 @@
  *   void NAME();
  * where NAME is the argument passed to TRAPHANDLER.
  */
-#define TRAPHANDLER(name, num)						\
-	.globl name;		/* define global symbol for 'name' */	\
-	.type name, @function;	/* symbol type is function */		\
-	.align 2;		/* align function definition */		\
-	name:			/* function starts here */		\
-	pushl $(num);							\
+#define TRAPHANDLER(name, num)                           \
+	.globl name;		/* define global symbol for 'name' */	 \
+	.type name, @function;	/* symbol type is function */  \
+	.align 2;		/* align function definition */            \
+	name:			/* function starts here */                   \
+	pushl $(num);                                          \
 	jmp _alltraps
 
 /* Use TRAPHANDLER_NOEC for traps where the CPU doesn't push an error code.
  * It pushes a 0 in place of the error code, so the trap frame has the same
  * format in either case.
  */
-#define TRAPHANDLER_NOEC(name, num)					\
-	.globl name;							\
-	.type name, @function;						\
-	.align 2;							\
-	name:								\
-	pushl $0;							\
-	pushl $(num);							\
+#define TRAPHANDLER_NOEC(name, num)   \
+	.globl name;                        \
+	.type name, @function;              \
+	.align 2;                           \
+	name:                               \
+	pushl $0;                           \
+	pushl $(num);                       \
+	jmp _alltraps
+
+#define TRAPHANDLER_IRQ(name, num)    \
+	.globl name;                        \
+	.type name, @function;              \
+	.align 2;                           \
+	name:                               \
+	pushl $0;                           \
+	pushl $(IRQ_OFFSET+num);            \
 	jmp _alltraps
 
 .text
@@ -70,6 +79,13 @@ TRAPHANDLER(th_stack , T_STACK )
 TRAPHANDLER(th_gpflt , T_GPFLT )
 TRAPHANDLER(th_pgflt , T_PGFLT )
 TRAPHANDLER(th_align , T_ALIGN )
+
+TRAPHANDLER_IRQ(th_timer   , IRQ_TIMER   )
+TRAPHANDLER_IRQ(th_kbd     , IRQ_KBD     )
+TRAPHANDLER_IRQ(th_serial  , IRQ_SERIAL  )
+TRAPHANDLER_IRQ(th_spurious, IRQ_SPURIOUS)
+TRAPHANDLER_IRQ(th_ide     , IRQ_IDE     )
+TRAPHANDLER_IRQ(th_error   , IRQ_ERROR   )
 
 /*
  * Lab 3: Your code here for _alltraps

@@ -223,7 +223,8 @@ sys_page_alloc(envid_t envid, void *va, int perm)
   if (rc < 0)
     return rc;
 
-  struct PageInfo *pp = page_alloc(0);
+  // set to 0 as required
+  struct PageInfo *pp = page_alloc(ALLOC_ZERO);
   if (!pp)
     return -E_NO_MEM;
 
