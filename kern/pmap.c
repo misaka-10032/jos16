@@ -670,7 +670,7 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// value will be preserved between calls to mmio_map_region
 	// (just like nextfree in boot_alloc).
 
-  // assumes base is already aligned
+  static_assert(MMIOBASE % PGSIZE == 0);
 	static uintptr_t base = MMIOBASE;
 
 	// Reserve size bytes of virtual memory starting at base and
@@ -692,7 +692,11 @@ mmio_map_region(physaddr_t pa, size_t size)
 	//
 	// Your code here:
 
+  physaddr_t pa_old = pa;
+  pa = ROUNDDOWN(pa, PGSIZE);
+  size += pa_old - pa;
   size = ROUNDUP(size, PGSIZE);
+
   if (base + size > MMIOLIM)
     panic("MMIO used up!");
 
