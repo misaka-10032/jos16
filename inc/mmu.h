@@ -53,6 +53,8 @@
 
 #define PTXSHIFT	12		// offset of PTX in a linear address
 #define PDXSHIFT	22		// offset of PDX in a linear address
+#define PTXWIDTH  10    // number of bits for ptx
+#define PDXWIDTH  10    // number of bits for pdx
 
 // Page table/directory entry flags.
 #define PTE_P		0x001	// Present
