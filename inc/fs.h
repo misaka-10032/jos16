@@ -12,6 +12,9 @@
 #define BLKSIZE		PGSIZE
 #define BLKBITSIZE	(BLKSIZE * 8)
 
+// number of bno entries in a block
+#define BLKBNOS (BLKSIZE / 4)
+
 // Maximum size of a filename (a single path component), including null
 // Must be a multiple of 4
 #define MAXNAMELEN	128

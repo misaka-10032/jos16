@@ -172,6 +172,8 @@ fs_init(void)
 // When 'alloc' is set, this function will allocate an indirect block
 // if necessary.
 //
+// It only walks to the slot, but does not init the slot.
+//
 // Returns:
 //	0 on success (but note that *ppdiskbno might equal 0).
 //	-E_NOT_FOUND if the function needed to allocate an indirect block, but
@@ -184,12 +186,35 @@ fs_init(void)
 static int
 file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool alloc)
 {
-       // LAB 5: Your code here.
-       panic("file_block_walk not implemented");
+  // LAB 5: Your code here.
+  if (filebno < NDIRECT) {
+    *ppdiskbno = f->f_direct + filebno;
+    return 0;
+  }
+
+  if (filebno > NDIRECT + NINDIRECT)
+    return -E_INVAL;
+
+  if (!f->f_indirect) {
+    if (!alloc)
+      return -E_NOT_FOUND;
+
+    int rc = alloc_block();
+    if (rc < 0)
+      return rc;
+
+    f->f_indirect = (uint32_t) rc;
+    memset(diskaddr(f->f_indirect), 0, BLKSIZE);
+  }
+
+  *ppdiskbno = diskaddr(f->f_indirect) + filebno - NDIRECT;
+  return 0;
 }
 
 // Set *blk to the address in memory where the filebno'th
 // block of file 'f' would be mapped.
+//
+// Allocate the block if it's not yet allocated.
 //
 // Returns 0 on success, < 0 on error.  Errors are:
 //	-E_NO_DISK if a block needed to be allocated but the disk is full.
@@ -200,7 +225,20 @@ int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
   // LAB 5: Your code here.
-  panic("file_get_block not implemented");
+  uint32_t *bno_ptr;
+  int rc = file_block_walk(f, filebno, &bno_ptr, 1);
+  if (rc < 0)
+    return rc;
+
+  if (!*bno_ptr) {
+    rc = alloc_block();
+    if (rc < 0)
+      return rc;
+    *bno_ptr = rc;
+  }
+
+  *blk = (char *) diskaddr(*bno_ptr);
+  return 0;
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
