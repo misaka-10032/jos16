@@ -101,8 +101,7 @@ alloc_block(void)
 
   for (blockno = bstart; blockno < super->s_nblocks; blockno++) {
 
-    // TODO: logic to be tested
-    if (blockno % 32 == 0 && bitmap[blockno/32] == (uint32_t) -1) {
+    if (blockno % 32 == 0 && !bitmap[blockno/32]) {
       blockno += 31;  // another 1 is added by for loop
       continue;
     }
@@ -204,10 +203,10 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
       return rc;
 
     f->f_indirect = (uint32_t) rc;
-    memset(diskaddr(f->f_indirect), 0, BLKSIZE);
+    memset(diskaddr(rc), 0, BLKSIZE);
   }
 
-  *ppdiskbno = diskaddr(f->f_indirect) + filebno - NDIRECT;
+  *ppdiskbno = (uint32_t*) diskaddr(f->f_indirect) + filebno - NDIRECT;
   return 0;
 }
 

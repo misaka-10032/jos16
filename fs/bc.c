@@ -6,7 +6,8 @@ void*
 diskaddr(uint32_t blockno)
 {
 	if (blockno == 0 || (super && blockno >= super->s_nblocks))
-		panic("bad block number %08x in diskaddr", blockno);
+		panic("bad block number %08x (vs %08x) in diskaddr",
+          blockno, super->s_nblocks);
 	return (char*) (DISKMAP + blockno * BLKSIZE);
 }
 
@@ -94,6 +95,9 @@ flush_block(void *addr)
 	// LAB 5: Your code here.
   if (!va_is_mapped(addr) || !va_is_dirty(addr))
     return;
+
+  static_assert(BLKSIZE % PGSIZE == 0);
+  addr = ROUNDDOWN(addr, BLKSIZE);
 
   int rc = ide_write(blockno*BLKSECTS, addr, BLKSECTS);
   if (rc < 0)
