@@ -36,6 +36,38 @@ block_is_free(uint32_t blockno)
 	return 0;
 }
 
+// Set the corresponding blockno in bitmap to 1.
+// That indicates the block is free now.
+void
+bitmap_set(uint32_t blockno)
+{
+  uint32_t idx = blockno / 32;
+  uint32_t mask = 1 << (blockno % 32);
+  uint32_t bflush = 2 + idx * 4 / BLKSIZE;
+
+  if (bitmap[idx] & mask)
+    return;
+
+  bitmap[idx] |= mask;
+  flush_block(diskaddr(bflush));
+}
+
+// Unset the corresponding blockno in bitmap to 0.
+// That indicates the block is used now.
+void
+bitmap_unset(uint32_t blockno)
+{
+  uint32_t idx = blockno / 32;
+  uint32_t mask = 1 << (blockno % 32);
+  uint32_t bflush = 2 + idx * 4 / BLKSIZE;
+
+  if (!(bitmap[idx] & mask))
+    return;
+
+  bitmap[idx] -= mask;
+  flush_block(diskaddr(bflush));
+}
+
 // Mark a block free in the bitmap
 void
 free_block(uint32_t blockno)
@@ -62,7 +94,25 @@ alloc_block(void)
 	// super->s_nblocks blocks in the disk altogether.
 
 	// LAB 5: Your code here.
-	panic("alloc_block not implemented");
+  int rc;
+  uint32_t blockno;
+  uint32_t blkszbits = BLKSIZE * 8;  // block size in bit
+  uint32_t bstart = 2 + (super->s_nblocks + blkszbits - 1) / blkszbits;
+
+  for (blockno = bstart; blockno < super->s_nblocks; blockno++) {
+
+    // TODO: logic to be tested
+    if (blockno % 32 == 0 && bitmap[blockno/32] == (uint32_t) -1) {
+      blockno += 31;  // another 1 is added by for loop
+      continue;
+    }
+
+    if (block_is_free(blockno)) {
+      bitmap_unset(blockno);
+      return blockno;
+    }
+  }
+
 	return -E_NO_DISK;
 }
 
@@ -112,7 +162,7 @@ fs_init(void)
 	// Set "bitmap" to the beginning of the first bitmap block.
 	bitmap = diskaddr(2);
 	check_bitmap();
-	
+
 }
 
 // Find the disk block number slot for the 'filebno'th block in file 'f'.
@@ -149,8 +199,8 @@ file_block_walk(struct File *f, uint32_t filebno, uint32_t **ppdiskbno, bool all
 int
 file_get_block(struct File *f, uint32_t filebno, char **blk)
 {
-       // LAB 5: Your code here.
-       panic("file_get_block not implemented");
+  // LAB 5: Your code here.
+  panic("file_get_block not implemented");
 }
 
 // Try to find a file named "name" in dir.  If so, set *file to it.
