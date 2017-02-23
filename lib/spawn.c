@@ -302,6 +302,28 @@ static int
 copy_shared_pages(envid_t child)
 {
 	// LAB 5: Your code here.
+  size_t pdx, ptx, vpn;
+  size_t pdx_ub = PDX(UTOP);
+
+  for (pdx = 0; pdx < pdx_ub; pdx++) {
+    const pde_t *pde = (const pde_t *) uvpd + pdx;
+    if (!(*pde & PTE_P))
+      continue;
+
+    for (ptx = 0; ptx < NPTENTRIES; ptx++) {
+      vpn = (pdx << PTXWIDTH) | ptx;
+      const pte_t *pte = (const pte_t *) uvpt + vpn;
+      if (!(*pte & PTE_P) ||
+          !(*pte & PTE_SHARE))
+        continue;
+
+      void *va = PGADDR(pdx, ptx, 0);
+      int perm = *pte & PTE_SYSCALL;
+      int rc = sys_page_map(0, va, child, va, perm);
+      if (rc < 0)
+        return -1;
+    }
+  }
 	return 0;
 }
 

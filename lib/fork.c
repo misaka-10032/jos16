@@ -15,8 +15,10 @@ static void
 pgfault(struct UTrapframe *utf)
 {
 	void *addr = (void *) utf->utf_fault_va;
+  void *va = ROUNDDOWN(addr, PGSIZE);
+  const pte_t *pte = (const pte_t *) uvpt + PGNUM(va);
 	uint32_t err = utf->utf_err;
-	int r;
+	int rc, perm;
 
 	// Check that the faulting access was (1) a write, and (2) to a
 	// copy-on-write page.  If not, panic.
@@ -25,6 +27,14 @@ pgfault(struct UTrapframe *utf)
 	//   (see <inc/memlayout.h>).
 
 	// LAB 4: Your code here.
+  // TODO: remove this later for disk write
+  if (*pte & PTE_W)
+    panic("pgfault at PTE_W!");
+
+  if (!(*pte & PTE_COW))
+    panic("pgfault at non PTE_COW!");
+
+  perm = PTE_U | PTE_W | PTE_P;
 
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
@@ -33,8 +43,18 @@ pgfault(struct UTrapframe *utf)
 	//   You should make three system calls.
 
 	// LAB 4: Your code here.
+  rc = sys_page_alloc(0, UTEMP, perm);
+  if (rc < 0)
+    panic("Unable to alloc at UTEMP!");
 
-	panic("pgfault not implemented");
+  memcpy(UTEMP, va, PGSIZE);
+  rc = sys_page_map(0, UTEMP, 0, va, perm);
+  if (rc < 0)
+    panic("Unable to map from UTEMP to va!");
+
+  rc = sys_page_unmap(0, UTEMP);
+  if (rc < 0)
+    panic("Unable to unmap UTEMP!");
 }
 
 //
@@ -49,12 +69,41 @@ pgfault(struct UTrapframe *utf)
 // It is also OK to panic on error.
 //
 static int
-duppage(envid_t envid, unsigned pn)
+duppage(envid_t eid, size_t vpn)
 {
-	int r;
+	int rc;
 
 	// LAB 4: Your code here.
-	panic("duppage not implemented");
+  void *va = (void *) (vpn << PGSHIFT);
+  const pte_t *pte = (const pte_t *) uvpt + vpn;
+
+  if ((*pte & PTE_SHARE)) {
+
+    int perm = *pte & PTE_SYSCALL;
+    rc = sys_page_map(0, va, eid, va, perm);
+    if (rc < 0)
+      return -1;
+
+  } else if ((*pte & PTE_W) || (*pte & PTE_COW)) {
+
+    // map child first, then parent.
+    int perm = PTE_COW | PTE_U | PTE_P;
+    rc = sys_page_map(0, va, eid, va, perm);
+    if (rc < 0)
+      return -1;
+
+    rc = sys_page_map(0, va, 0, va, perm);
+    if (rc < 0)
+      return -1;
+
+  } else {
+
+    int perm = PTE_U | PTE_P;
+    rc = sys_page_map(0, va, eid, va, perm);
+    if (rc < 0)
+      return -1;
+  }
+
 	return 0;
 }
 
@@ -78,7 +127,64 @@ envid_t
 fork(void)
 {
 	// LAB 4: Your code here.
-	panic("fork not implemented");
+  set_pgfault_handler(pgfault);
+
+  int eid = sys_exofork();
+  if (eid < 0)
+    panic("sys_exofork failure!");
+
+  /* child */
+  if (eid == 0) {
+    thisenv = &envs[ENVX(sys_getenvid())];
+    return 0;
+  }
+
+  /* parent */
+  int rc;
+  size_t pdx, ptx, vpn;
+  // this makes it easy to check page tables
+  static_assert(UTOP % PTSIZE == 0);
+  size_t pdx_ub = PDX(UTOP);
+
+  // iterate over pdx, ptx to find all page tables present.
+  for (pdx = 0; pdx < pdx_ub; pdx++) {
+    const pde_t *pde = (const pde_t *) uvpd + pdx;
+    if (!(*pde & PTE_P))
+      continue;
+
+    for (ptx = 0; ptx < NPTENTRIES; ptx++) {
+      vpn = (pdx << PTXWIDTH) | ptx;
+      const pte_t *pte = (const pte_t *) uvpt + vpn;
+      if (!(*pte & PTE_P))
+        continue;
+      if (vpn << PGSHIFT == UXSTACKTOP - PGSIZE)
+        continue;
+
+      // duppage page table for child env.
+      // change PTE_W to PTE_COW for itself.
+      duppage(eid, vpn);
+    }
+  }
+
+  // alloc uxstack for child
+  rc = sys_page_alloc(eid, (void*) UXSTACKTOP-PGSIZE,
+                      PTE_U | PTE_W | PTE_P);
+  if (rc < 0)
+    goto forkbad;
+
+  // setup pgfault_upcall for child
+  if (sys_env_set_pgfault_upcall(eid, thisenv->env_pgfault_upcall) < 0)
+    goto forkbad;
+
+  // make child runnable
+  if (sys_env_set_status(eid, ENV_RUNNABLE) < 0)
+    goto forkbad;
+
+  return eid;
+
+forkbad:
+  sys_env_destroy(eid);
+  return -1;
 }
 
 // Challenge!

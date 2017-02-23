@@ -6,8 +6,15 @@ void*
 diskaddr(uint32_t blockno)
 {
 	if (blockno == 0 || (super && blockno >= super->s_nblocks))
-		panic("bad block number %08x in diskaddr", blockno);
+		panic("bad block number %08x (vs %08x) in diskaddr",
+          blockno, super->s_nblocks);
 	return (char*) (DISKMAP + blockno * BLKSIZE);
+}
+
+inline uint32_t
+va2bn(void *addr)
+{
+  return ((uint32_t) addr - DISKMAP) / BLKSIZE;
 }
 
 // Is this virtual address mapped?
@@ -48,6 +55,15 @@ bc_pgfault(struct UTrapframe *utf)
 	// the disk.
 	//
 	// LAB 5: you code here:
+  addr = ROUNDDOWN(addr, PGSIZE);
+  struct PageInfo *pp;
+  int rc = sys_page_alloc(0, addr, PTE_SYSCALL);
+  if (rc < 0)
+    panic("Unable to alloc the page in page fault!");
+
+  rc = ide_read(blockno*BLKSECTS, addr, BLKSECTS);
+  if (rc < 0)
+    panic("Unable to read from disk!");
 
 	// Clear the dirty bit for the disk block page since we just read the
 	// block from disk
@@ -77,7 +93,19 @@ flush_block(void *addr)
 		panic("flush_block of bad va %08x", addr);
 
 	// LAB 5: Your code here.
-	panic("flush_block not implemented");
+  if (!va_is_mapped(addr) || !va_is_dirty(addr))
+    return;
+
+  static_assert(BLKSIZE % PGSIZE == 0);
+  addr = ROUNDDOWN(addr, BLKSIZE);
+
+  int rc = ide_write(blockno*BLKSECTS, addr, BLKSECTS);
+  if (rc < 0)
+    panic("Unable to flush block to disk!");
+
+  rc = sys_page_map(0, addr, 0, addr, PTE_SYSCALL);
+  if (rc < 0)
+    panic("Unable to reset PTE_D!");
 }
 
 // Test that the block cache works, by smashing the superblock and

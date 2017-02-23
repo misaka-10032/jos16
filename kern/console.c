@@ -4,6 +4,7 @@
 #include <inc/memlayout.h>
 #include <inc/kbdreg.h>
 #include <inc/string.h>
+#include <inc/stdio.h>
 #include <inc/assert.h>
 
 #include <kern/console.h>
@@ -133,6 +134,7 @@ lpt_putc(int c)
 static unsigned addr_6845;
 static uint16_t *crt_buf;
 static uint16_t crt_pos;
+extern int cga_color;
 
 static void
 cga_init(void)
@@ -140,6 +142,9 @@ cga_init(void)
 	volatile uint16_t *cp;
 	uint16_t was;
 	unsigned pos;
+
+  // init cga_color
+  cga_color = COLOR_WHT;
 
 	cp = (uint16_t*) (KERNBASE + CGA_BUF);
 	was = *cp;
@@ -162,14 +167,12 @@ cga_init(void)
 	crt_pos = pos;
 }
 
-
-
 static void
 cga_putc(int c)
 {
-	// if no attribute given, then use black on white
-	if (!(c & ~0xFF))
-		c |= 0x0700;
+	// if no attribute given, then use cga_color
+	if (!(c & ~0xff))
+		c |= cga_color << 8;
 
 	switch (c & 0xff) {
 	case '\b':
@@ -202,7 +205,7 @@ cga_putc(int c)
 
 		memmove(crt_buf, crt_buf + CRT_COLS, (CRT_SIZE - CRT_COLS) * sizeof(uint16_t));
 		for (i = CRT_SIZE - CRT_COLS; i < CRT_SIZE; i++)
-			crt_buf[i] = 0x0700 | ' ';
+			crt_buf[i] = (cga_color << 8) | ' ';
 		crt_pos -= CRT_COLS;
 	}
 
