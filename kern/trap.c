@@ -261,6 +261,14 @@ trap_dispatch(struct Trapframe *tf)
       lapic_eoi();
       sched_yield();
       return;
+
+    case IRQ_KBD:
+      kbd_intr();
+      return;
+
+    case IRQ_SERIAL:
+      serial_intr();
+      return;
   }
 
   // Handle custom interrupts

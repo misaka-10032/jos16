@@ -77,7 +77,14 @@ duppage(envid_t eid, size_t vpn)
   void *va = (void *) (vpn << PGSHIFT);
   const pte_t *pte = (const pte_t *) uvpt + vpn;
 
-  if ((*pte & PTE_W) || (*pte & PTE_COW)) {
+  if ((*pte & PTE_SHARE)) {
+
+    int perm = *pte & PTE_SYSCALL;
+    rc = sys_page_map(0, va, eid, va, perm);
+    if (rc < 0)
+      return -1;
+
+  } else if ((*pte & PTE_W) || (*pte & PTE_COW)) {
 
     // map child first, then parent.
     int perm = PTE_COW | PTE_U | PTE_P;
